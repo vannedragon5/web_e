@@ -740,7 +740,7 @@ def get_church_balance(church_id):
             c.execute("SELECT id FROM churches WHERE id = ? AND (parent_id = ? OR id = ?)", (church_id, associated_church_id, associated_church_id))
             if c.fetchone():
                 is_authorized = True
-        elif user_role == 'branch_admin' and church_id == associated_church_id:
+        elif user_role == 'branch_admin' and church_id == int(associated_church_id):
             # Branch admin can only view balance of their associated church
             is_authorized = True
 
@@ -776,4 +776,4 @@ def get_church_balance(church_id):
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='10.130.236.214', port=8888)
+    app.run(debug=True, host='http://0.0.0.0:10000', port=8888)
