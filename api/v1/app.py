@@ -775,5 +775,94 @@ def get_church_balance(church_id):
         conn.close()
         return jsonify({'error': str(e)}), 500
 
+# --- Messaging Endpoints ---
+
+@app.route('/messages', methods=['POST'])
+def send_message():
+    user_id, user_role, associated_church_id, error_response, status_code = check_auth(request)
+    if error_response: return error_response, status_code
+
+    data = request.get_json()
+    receiver_church_id = data.get('receiver_church_id')
+    message_content = data.get('message_content')
+
+    if not receiver_church_id or not message_content:
+        return jsonify({'error': 'Receiver and message content are required!'}), 400
+
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+
+    try:
+        c.execute("INSERT INTO messages (sender_church_id, receiver_church_id, message_content) VALUES (?, ?, ?)",
+                  (associated_church_id, receiver_church_id, message_content))
+        conn.commit()
+        return jsonify({'message': 'Message sent successfully!'}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/conversations', methods=['GET'])
+def get_conversations():
+    user_id, user_role, associated_church_id, error_response, status_code = check_auth(request)
+    if error_response: return error_response, status_code
+
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+
+    try:
+        # Get all churches that the current user can talk to
+        if user_role == 'main_church':
+            # Main church can talk to all its branches
+            c.execute("SELECT id, name FROM churches WHERE parent_id = ?", (associated_church_id,))
+        else: # branch_admin
+            # Branch admin can talk to the main church and other branches
+            c.execute("SELECT parent_id FROM churches WHERE id = ?", (associated_church_id,))
+            parent_id = c.fetchone()
+            if parent_id:
+                c.execute("SELECT id, name FROM churches WHERE parent_id = ? OR id = ?", (parent_id[0], parent_id[0]))
+            else: # Should not happen, but as a fallback, just return the main church
+                c.execute("SELECT id, name FROM churches WHERE id = (SELECT parent_id FROM churches WHERE id = ?)", (associated_church_id,))
+        
+        churches = c.fetchall()
+        
+        conversations = []
+        for church in churches:
+            if str(church[0]) != str(associated_church_id): # Exclude self
+                conversations.append({"id": church[0], "name": church[1]})
+
+        return jsonify(conversations), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/messages/<int:other_church_id>', methods=['GET'])
+def get_messages(other_church_id):
+    user_id, user_role, associated_church_id, error_response, status_code = check_auth(request)
+    if error_response: return error_response, status_code
+
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+
+    try:
+        my_church_id = int(associated_church_id)
+        c.execute("""
+            SELECT * FROM messages 
+            WHERE (sender_church_id = ? AND receiver_church_id = ?) 
+               OR (sender_church_id = ? AND receiver_church_id = ?)
+            ORDER BY timestamp ASC
+        """, (my_church_id, other_church_id, other_church_id, my_church_id))
+        
+        rows = c.fetchall()
+        messages = [{"id": r[0], "sender_church_id": r[1], "receiver_church_id": r[2], "message_content": r[3], "timestamp": r[4]} for r in rows]
+        
+        return jsonify(messages), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
 if __name__ == '__main__':
-    app.run(debug=True, host='http://0.0.0.0:10000', port=8888)
+    app.run(debug=True, host='http://192.168.100.221:8888', port=8888)

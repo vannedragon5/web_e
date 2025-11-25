@@ -10,6 +10,7 @@ def init_db():
     # Drop existing tables if they exist (for development simplicity)
     c.execute('DROP TABLE IF EXISTS projects;')
     c.execute('DROP TABLE IF EXISTS expenses;')
+    c.execute('DROP TABLE IF EXISTS messages;')
     c.execute('DROP TABLE IF EXISTS attendance;')
     c.execute('DROP TABLE IF EXISTS donations;')
     c.execute('DROP TABLE IF EXISTS events;')
@@ -111,6 +112,19 @@ def init_db():
             church_id INTEGER NOT NULL,
             FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE SET NULL,
             FOREIGN KEY (church_id) REFERENCES churches (id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Create messages table for instant messaging
+    c.execute('''
+        CREATE TABLE messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender_church_id INTEGER NOT NULL,
+            receiver_church_id INTEGER NOT NULL,
+            message_content TEXT NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (sender_church_id) REFERENCES churches (id) ON DELETE CASCADE,
+            FOREIGN KEY (receiver_church_id) REFERENCES churches (id) ON DELETE CASCADE
         )
     ''')
 
