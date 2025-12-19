@@ -4,6 +4,11 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 
+# Health check endpoint
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'ok'}), 200
+
 # User registration
 @app.route('/register', methods=['POST'])
 def register():
